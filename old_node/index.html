@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+    <ul>
+        <li>
+            <img src="data3/DSC_7692.JPG" height="auto" width="100%" >
+        </li>
+    </ul>
+</body>
+<script>
+    var data = JSON.stringify({
+    "rutaFotos": " //Users/jose/Documents/face-recognition/unique-fr/data3",
+    "fotoSemilla": "/DSC_7692.JPG"
+    });
+
+    var xhr = new XMLHttpRequest();
+    xhr.withCredentials = true;
+
+    xhr.addEventListener("readystatechange", function () {
+    if (this.readyState === 4) {
+        console.log(this.responseText);
+    }
+    });
+
+    xhr.open("POST", "http://localhost:3000/uniquefr/");
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.setRequestHeader("cache-control", "no-cache");
+    xhr.setRequestHeader("Postman-Token", "98554ede-64a3-4136-b92a-73d92dbac906");
+
+    xhr.send(data);
+</script>
+</html>
