@@ -3,7 +3,7 @@ import express from "express";
 import * as fs from "fs";
 // import nodejs bindings to native tensorflow,
 // not required, but will speed up things drastically (python required)
-import '@tensorflow/tfjs-node';
+// import '@tensorflow/tfjs-node';
 
 // implements nodejs wrappers for HTMLCanvasElement, HTMLImageElement, ImageData
 //import * as canvas from 'canvas';
@@ -36,13 +36,11 @@ app.listen( port, () => {
 } );
 
 async function matchRostros( objAlbumDatos: any ) {    
-    var today = new Date();
-    console.log( "tiempo inicio:"+today.getHours() + ":" + today.getMinutes() + ":" + today.getSeconds() );    
-    // await faceDetectionNet.loadFromDisk('../weights')
+  
     await faceapi.nets.ssdMobilenetv1.loadFromDisk('../weights');
     await faceapi.nets.faceLandmark68Net.loadFromDisk('../weights')
-    await faceapi.nets.faceRecognitionNet.loadFromDisk('../weights')
-    
+    await faceapi.nets.faceRecognitionNet.loadFromDisk('../weights')    
+
     var labelArray = new Array();
     var matchArray = new Array();
     const directori = objAlbumDatos.rutaFotosAlbum;
@@ -50,9 +48,7 @@ async function matchRostros( objAlbumDatos: any ) {
     const rutFotoSemilla = objAlbumDatos.rutaFotosAlbum + "/" + objAlbumDatos.fotoSemilla;
     const canvasFotoSemilla = await canvas.loadImage(rutFotoSemilla);
     
-    const resultsFotoSemilla = await faceapi.detectAllFaces(canvasFotoSemilla)
-                                            .withFaceLandmarks()
-                                            .withFaceDescriptors();            
+    const resultsFotoSemilla = await faceapi.detectAllFaces(canvasFotoSemilla).withFaceLandmarks().withFaceDescriptors();
 
     resultsFotoSemilla.forEach( (key, index)=>{
         var labelName = new faceapi.LabeledFaceDescriptors(`Persona ${index++}`,[ key.descriptor ]);
@@ -60,32 +56,59 @@ async function matchRostros( objAlbumDatos: any ) {
     });    
     const faceMatcher = new faceapi.FaceMatcher(labelArray);
     
-    arrayFotosEnAlbum.forEach(async (file,index) => {
-      let fileType = file.split(".");
-      let tempMathArray = new Array();  
-      if ( fileType[1] === "jpg" || fileType[1] === "JPG" ) {
-        if(file === "DSC_7708.JPG"){
-        var rutFotoLista = objAlbumDatos.rutaFotosAlbum + "/" + file;
-        var canvasFotoLista = await canvas.loadImage(rutFotoLista);
-        var resultsQueryFotoLista = await faceapi.detectAllFaces(canvasFotoLista)
-                                                    .withFaceLandmarks()
-                                                    .withFaceDescriptors();
-
-        await resultsQueryFotoLista.forEach(fd =>{
-            var bestMatch = faceMatcher.findBestMatch(fd.descriptor);
+    var resultadoFotos = await Promise.all(arrayFotosEnAlbum.map(async (file,index) => {
+            // console.log("Tiempo Inicio:"+ await getTimeNow());
+            let fileType = file.split(".");            
             
-            tempMathArray.push({"label":bestMatch.label, "distance": bestMatch.distance});
-        });
-        await matchArray.push({tempMathArray, file});
-        console.log("matchArray 1:");
-        console.log( JSON.stringify(matchArray) );
-        var today2 = new Date();
-        console.log("tiempo fin:"+today2.getHours() + ":" + today2.getMinutes() + ":" + today2.getSeconds());
+            if ( fileType[1] === "jpg" || fileType[1] === "JPG" ) {
+              
+              var rutFotoLista = objAlbumDatos.rutaFotosAlbum + "/" + file;
+              var canvasFotoLista = await canvas.loadImage(rutFotoLista);
+              var resultsQueryFotoLista = await faceapi.detectAllFaces(canvasFotoLista).withFaceLandmarks().withFaceDescriptors();
+              
+              return await {resultsQueryFotoLista, file};
+              
+            }
+            // console.log("Tiempo Fin :" + await getTimeNow() );            
+          }));
+    var arrayFacesMatch = await Promise.all ( resultadoFotos.map(fd =>{                  
+                  if(fd){
+                    let tempMathArray = new Array();
+                    var arrayBestMatch = fd.resultsQueryFotoLista.map( value =>{
+                    var bestMatch =  faceMatcher.findBestMatch(value.descriptor);
+                    
+                      if (bestMatch.label !== "unknown" && bestMatch.distance < 0.5){
+                        tempMathArray.push({"label":bestMatch.label, "distance": bestMatch.distance});                      
+                        return  tempMathArray;
+                      }
+
+                    });                    
+                    if ( arrayBestMatch !== null ){                      
+                      return {arrayBestMatch, "fileName": fd.file} ;
+                    }
+                    
+                  }
+              }) );
+    console.log(arrayFacesMatch.toString() ) ;
+    console.log("regreso algo");
+    var result = arrayFacesMatch.map( value =>{
+        var temValue;
+        if (value){
+          temValue = value;
+          // var temp = value.arrayBestMatch[0].map( val =>{            
+          // });
+          if(value.arrayBestMatch[0]){
+            console.log(value.arrayBestMatch[0].length);
+            matchArray.push({"filaName":temValue.fileName });
+            
+          }          
         }
-      }
-      
-    });
-    
-    return matchArray;
+    });    
+    return await matchArray;
 }
 
+function getTimeNow (){
+  var today = new Date();
+  var now = today.getHours() + ":" + today.getMinutes() + ":" + today.getSeconds();
+  return now;
+}
